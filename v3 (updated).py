@@ -2,19 +2,22 @@ from customtkinter import *
 import requests
 from datetime import datetime, timedelta
 from PIL import Image, ImageTk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # Caminho do ícone
 icon_path = "icone.ico"
 logo_path = "icone.png"
 
 app = CTk()
-app.geometry("1000x600")
+app.geometry("1200x600")
 set_appearance_mode("dark")
 app.title("Meteorologia")
 app.iconbitmap(icon_path) # Adiciona um ícone à janela
 
 # Variáveis globais para o alerta e dados climáticos
 invalid_city = None
+weather_data = None
 frames = []  # Lista para armazenar os frames dos dias
 
 # Funções
@@ -38,10 +41,11 @@ def get_cords(city):
         return None, None
 
 def get_weather_data():
+    global weather_data
     city = city_entry.get()
     latitude, longitude = get_cords(city)
     if latitude is not None and longitude is not None:
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Europe%2FLondon"
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,relative_humidity_2m,precipitation,rain,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,rain,cloud_cover,wind_speed_10m,wind_direction_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max&timezone=Europe%2FLondon"
         try:
             weather_data = requests.get(url).json()
             display_weather_data(weather_data)
@@ -87,6 +91,71 @@ def display_weather_data(data):
         precipitation_label = CTkLabel(master=day_frame, text=f"Precipitação: {daily_data['precipitation_sum'][i]} mm")
         precipitation_label.pack(pady=5)
 
+        # Adiciona botão para ver gráficos
+        graph_button = CTkButton(master=day_frame, text="Ver Gráficos", command=lambda day_name=day_name, index=i: show_graphs(day_name, index))
+        graph_button.pack(pady=5)
+
+
+def show_graphs(day, index):
+    global weather_data
+    hourly_data = weather_data['hourly']
+    temperatures = hourly_data['temperature_2m'][index*24:(index+1)*24]
+    windspeed = hourly_data['wind_speed_10m'][index*24:(index+1)*24]
+    precipitation = hourly_data['precipitation'][index*24:(index+1)*24]
+    humidity = hourly_data['relative_humidity_2m'][index*24:(index+1)*24]
+
+    # Cria uma nova janela para os gráficos
+    #graph_window = CTk()
+    #graph_window.geometry("1000x600")
+    #graph_window.title(f"Gráficos para {day}")
+
+    # Cria uma nova janela para os gráficos
+    graph_window = CTkToplevel(app)
+    graph_window.geometry("1000x600")
+    graph_window.title(f"Gráficos para {day}")
+
+    # Traz a nova janela para frente
+    graph_window.focus_force()
+    graph_window.grab_set()
+
+    # Plota o gráfico de temperatura
+    plt.subplot(221)
+    plt.plot(range(24), temperatures, color='red')
+    plt.xlabel('Hora do Dia')
+    plt.ylabel('Temperatura (°C)')
+    plt.title('Variação da Temperatura ao Longo do Dia')
+
+    # Plota o gráfico de velocidade do vento
+    plt.subplot(222)
+    plt.plot(range(24), windspeed, color='blue')
+    plt.xlabel('Hora do Dia')
+    plt.ylabel('Velocidade do Vento (km/h)')
+    plt.title('Variação da Velocidade do Vento ao Longo do Dia')
+
+    # Plota o gráfico de precipitação
+    plt.subplot(223)
+    plt.plot(range(24), precipitation, color='green')
+    plt.xlabel('Hora do Dia')
+    plt.ylabel('Precipitação (mm)')
+    plt.title('Variação da Precipitação ao Longo do Dia')
+
+    # Plota o gráfico de umidade
+    plt.subplot(224)
+    plt.plot(range(24), humidity, color='orange')
+    plt.xlabel('Hora do Dia')
+    plt.ylabel('Umidade (%)')
+    plt.title('Variação da Umidade ao Longo do Dia')
+
+    plt.tight_layout()  # Ajusta automaticamente o layout para evitar sobreposição
+
+    # Converte a figura em um widget que pode ser adicionado ao tkinter
+    canvas = FigureCanvasTkAgg(plt.gcf(), master=graph_window)
+    canvas.draw()
+    canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+
+    # Fecha a janela de gráficos ao clicar no botão "Voltar"
+    def close_window():
+        graph_window.destroy()
 
 
 # Design
