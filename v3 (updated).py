@@ -49,6 +49,12 @@ def get_weather_data():
         try:
             weather_data = requests.get(url).json()
             display_weather_data(weather_data)
+
+            # Verificação de desastres naturais
+            alerts = check_for_disasters(weather_data)
+            if alerts:
+                display_alerts(alerts, city)
+
         except Exception as e:
             print(f"Erro ao obter dados: {e}")
     else:
@@ -105,11 +111,6 @@ def show_graphs(day, index):
     humidity = hourly_data['relative_humidity_2m'][index*24:(index+1)*24]
 
     # Cria uma nova janela para os gráficos
-    #graph_window = CTk()
-    #graph_window.geometry("1000x600")
-    #graph_window.title(f"Gráficos para {day}")
-
-    # Cria uma nova janela para os gráficos
     graph_window = CTkToplevel(app)
     graph_window.geometry("1000x600")
     graph_window.title(f"Gráficos para {day}")
@@ -157,6 +158,59 @@ def show_graphs(day, index):
     def close_window():
         graph_window.destroy()
 
+
+def check_for_disasters(weather_data):
+    alerts = []
+    hourly_data = weather_data['hourly']
+
+    # Definição das condições de furacão
+    hurricane_conditions = {
+        "wind_speed": 119,  # km/h
+        "pressure": 980  # hPa (não disponível na API, mas poderia ser usado se disponível)
+    }
+
+    # Definição das condições de tornado
+    tornado_conditions = {
+        "wind_speed": 150  # km/h (aproximado)
+    }
+
+    # Definição das condições de inundação
+    flood_conditions = {
+        "precipitation": 50  # mm/h (aproximado)
+    }
+
+    # Verificação das condições a cada hora
+    for i in range(len(hourly_data['time'])):
+        wind_speed = hourly_data['wind_speed_10m'][i]
+        precipitation = hourly_data['precipitation'][i]
+
+        # Verificação de furacão
+        if wind_speed >= hurricane_conditions['wind_speed']:
+            alerts.append(f"Alerta de Furacão! Velocidade do vento: {wind_speed} km/h")
+
+        # Verificação de tornado
+        if wind_speed >= tornado_conditions['wind_speed']:
+            alerts.append(f"Alerta de Tornado! Velocidade do vento: {wind_speed} km/h")
+
+        # Verificação de inundação
+        if precipitation >= flood_conditions['precipitation']:
+            alerts.append(f"Alerta de Inundação! Precipitação: {precipitation} mm/h")
+
+    return alerts
+
+def display_alerts(alerts, city):
+    alert_window = CTk()
+    alert_window.geometry("400x200")
+    alert_window.title(f"Alertas de Desastres Naturais para {city}")
+
+    for alert in alerts:
+        alert_label = CTkLabel(master=alert_window, text=alert, text_color="red")
+        alert_label.pack(pady=10)
+
+    close_button = CTkButton(master=alert_window, text="Fechar", command=alert_window.destroy)
+    close_button.pack(pady=10)
+
+    alert_window.mainloop()
 
 # Design
 
